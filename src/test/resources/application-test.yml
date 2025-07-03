@@ -1,0 +1,80 @@
+# ============================================================================
+# APPLICATION-TEST.YML - CONFIGURAÇÃO FINAL PARA TESTES H2
+# ============================================================================
+
+spring:
+  # ========== DATASOURCE H2 ==========
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  
+  # ========== JPA/HIBERNATE ==========
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+  
+  # ========== H2 CONSOLE ==========
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # ========== SQL INITIALIZATION ==========
+  sql:
+    init:
+      mode: always
+      platform: h2
+  
+  # ========== LOGGING ==========
+  logging:
+    level:
+      org.hibernate: WARN
+      org.springframework: WARN
+      com.zaxxer.hikari: WARN
+
+# ========== APPLICATION PROPERTIES ==========
+app:
+  name: "TOTVS Integration Hub"
+  version: "1.0.0-SNAPSHOT"
+  description: "Integration Hub for Tests"
+  environment: "test"
+  
+  # ========== MULTI-TENANT CONFIGURATION ==========
+  multi-tenant:
+    header-name: "X-Tenant-ID"
+    enabled: false
+    default-tenant: "test-tenant"
+    strict-mode: false
+
+# ========== SWAGGER CONFIGURATION ==========
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+swagger:
+  enabled: false
+
+# ========== CACHE CONFIGURATION ==========
+cache:
+  enabled: false
+
+# ========== MANAGEMENT ENDPOINTS ==========
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

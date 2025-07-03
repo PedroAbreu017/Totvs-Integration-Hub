@@ -1,0 +1,103 @@
+# ==============================================================================
+# CONFIGURAÇÃO DE PRODUÇÃO - TOTVS INTEGRATION HUB (PostgreSQL)
+# ==============================================================================
+
+spring:
+  application:
+    name: totvs-integration-hub
+
+  # DATABASE - POSTGRESQL
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://totvs-postgres:5432/totvs_integration}
+    username: ${SPRING_DATASOURCE_USERNAME:totvs}
+    password: ${SPRING_DATASOURCE_PASSWORD:totvs123456789}
+    driver-class-name: org.postgresql.Driver
+    
+  # JPA/HIBERNATE
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: America/Sao_Paulo
+      
+  # CACHE - REDIS
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:totvs-redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:totvs123456789}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 2000ms
+
+  # CACHE TYPE
+  cache:
+    type: redis
+
+# MANAGEMENT & MONITORING
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# SERVER CONFIGURATION
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+# LOGGING
+logging:
+  level:
+    com.totvs.integration: ${LOGGING_LEVEL_COM_TOTVS_INTEGRATION:INFO}
+    org.springframework: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:WARN}
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    root: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# APPLICATION PROPERTIES
+app:
+  name: ${APP_NAME:TOTVS Integration Hub}
+  version: ${APP_VERSION:1.0.0}
+  description: ${APP_DESCRIPTION:Hub de integração para sistemas TOTVS}
+  
+  # MULTI-TENANT CONFIGURATION
+  multi-tenant:
+    enabled: ${APP_MULTI_TENANT_ENABLED:true}
+    default-tenant: ${APP_MULTI_TENANT_DEFAULT_TENANT:default}
+    header-name: ${APP_MULTI_TENANT_HEADER_NAME:X-Tenant-ID}
+    enforce-header: ${APP_MULTI_TENANT_ENFORCE_HEADER:false}
+    
+  # SECURITY CONFIGURATION
+  security:
+    api-key:
+      enabled: ${APP_SECURITY_API_KEY_ENABLED:false}
+      header-name: ${APP_SECURITY_API_KEY_HEADER:X-API-Key}
+    jwt:
+      secret: ${APP_SECURITY_JWT_SECRET:my-super-secret-jwt-key-for-totvs-integration}
+      expiration: ${APP_SECURITY_JWT_EXPIRATION:86400}
+
+# SWAGGER/OPENAPI
+springdoc:
+  api-docs:
+    path: ${SPRINGDOC_API_DOCS_PATH:/api-docs}
+  swagger-ui:
+    path: ${SPRINGDOC_SWAGGER_UI_PATH:/swagger-ui.html}

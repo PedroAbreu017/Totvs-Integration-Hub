@@ -1,0 +1,123 @@
+# ============================================================================
+# APPLICATION.YML - CONFIGURAÇÃO POSTGRESQL REAL
+# ============================================================================
+
+spring:
+  # ========== PERFIL ATIVO ==========
+  profiles:
+    active: dev
+  
+  # ========== DATASOURCE POSTGRESQL ==========
+  datasource:
+    url: jdbc:postgresql://localhost:5432/integration_hub
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    
+    # ========== POOL DE CONEXÕES ==========
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  
+  # ========== JPA/HIBERNATE ==========
+  jpa:
+    hibernate:
+      ddl-auto: update  # ✅ CRIA/ATUALIZA TABELAS AUTOMATICAMENTE
+    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          time_zone: America/Sao_Paulo
+  
+  # ========== SQL INITIALIZATION ==========
+  sql:
+    init:
+      mode: always
+      platform: postgresql
+  
+  # ========== REDIS - CONFIGURAÇÃO REAL ==========
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # password: ""  # Descomente se tiver senha
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000  # 10 minutos
+
+# ========== APPLICATION PROPERTIES ==========
+app:
+  name: "TOTVS Integration Hub"
+  version: "1.0.0-SNAPSHOT"
+  description: "Integration Hub - PostgreSQL & Redis"
+  environment: "development"
+  
+  # ========== MULTI-TENANT CONFIGURATION ==========
+  multi-tenant:
+    header-name: "X-Tenant-ID"
+    enabled: true
+    default-tenant: "default"
+    strict-mode: false
+  
+  # ========== SECURITY PROPERTIES ==========
+  security:
+    api-key:
+      header-name: "X-API-Key"
+      enabled: true
+      required: false  # Relaxado para desenvolvimento
+    jwt:
+      secret: "my-super-secret-jwt-key-change-in-production-2024"
+      expiration: 3600
+      enabled: true
+
+# ========== SWAGGER CONFIGURATION ==========
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    url: /v3/api-docs
+
+# ========== MANAGEMENT ENDPOINTS ==========
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    redis:
+      enabled: true
+
+# ========== LOGGING ==========
+logging:
+  level:
+    com.totvs.integration: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

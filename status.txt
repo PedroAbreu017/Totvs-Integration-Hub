@@ -1,0 +1,16 @@
+TOTVS Integration Hub - Status da Verificação
+============================================
+
+Data: Sun, Jun 29, 2025 12:25:48 PM
+Verificações passaram: 15
+Verificações falharam: 2
+Taxa de sucesso: 88%
+
+Status: ⚠️ PRECISA DE AJUSTES
+
+Próximos passos:
+1. Executar: ./start.sh
+2. Testar endpoints manualmente
+3. Verificar Swagger UI
+4. Deploy em produção
+
