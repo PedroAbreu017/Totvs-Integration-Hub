@@ -562,5 +562,3 @@ Este projeto é propriedade da **TOTVS** e está licenciado sob termos propriet�
 ---
 
 **✅ Migração MongoDB → PostgreSQL concluída com sucesso!**  
-*Desenvolvido com ❤️ pela equipe TOTVS*  
-*Última atualização: Outubro 2024*
