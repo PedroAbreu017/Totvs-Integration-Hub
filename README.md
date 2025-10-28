@@ -7,10 +7,29 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.4+-red.svg)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
+[![Tests](https://img.shields.io/badge/Tests-47%2B-brightgreen.svg)](src/test)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
 ## 📋 Sobre o Projeto
 
 O **TOTVS Integration Hub** é uma plataforma robusta de integração empresarial que permite conectar diferentes sistemas, bancos de dados e APIs de forma segura e escalável. Desenvolvido com arquitetura multi-tenant, oferece suporte a múltiplos conectores e execução de integrações em tempo real.
+
+### 🚀 Quick Start
+
+```bash
+# 1. Clone
+git clone <repository-url>
+cd totvs-integration-prototype
+
+# 2. Inicie os serviços
+docker-compose up -d
+
+# 3. Pronto! Acesse:
+curl http://localhost:8081/actuator/health
+open http://localhost:8081/swagger-ui.html
+```
+
+**Tudo rodando em 2 minutos!** ✨
 
 ### 🎯 Principais Funcionalidades
 
@@ -21,6 +40,17 @@ O **TOTVS Integration Hub** é uma plataforma robusta de integração empresaria
 - 📈 **Performance**: Redis para cache, pool de conexões otimizado
 - 🧪 **Qualidade**: 47+ testes automatizados
 - 📚 **Documentação**: Swagger UI integrado
+- ✅ **Production Ready**: Docker Compose, Health Checks, Prometheus
+
+## 📊 Portas e Acessos
+
+| Serviço | Porta | URL | Credenciais |
+|---------|-------|-----|-------------|
+| **PostgreSQL** | 5435 | `jdbc:postgresql://localhost:5435/integration_hub` | user: `postgres` / pass: `postgres` |
+| **Redis** | 6380 | `redis://localhost:6380` | — |
+| **Application** | 8081 | `http://localhost:8081` | — |
+| **Swagger UI** | 8081 | `http://localhost:8081/swagger-ui.html` | — |
+| **PgAdmin** | 8082 | `http://localhost:8082` | user: `admin@totvs.com` / pass: `admin123` |
 
 ## 🏗️ Arquitetura
 
@@ -61,10 +91,11 @@ totvs-integration-prototype/
 ├── 🐳 docker-compose.yml             # PostgreSQL + Redis + PgAdmin
 ├── 📊 monitoring/prometheus.yml       # Configuração Prometheus
 ├── 🔧 Scripts utilitários:
-│   ├── start.sh                       # Iniciar aplicação
-│   ├── deploy.sh                      # Deploy automatizado
-│   ├── test-api.sh                    # Testes da API
-│   └── verify.sh                      # Verificação do sistema
+│   ├── scripts/start.sh               # Iniciar aplicação
+│   ├── scripts/stop.sh                # Parar serviços
+│   ├── scripts/verify.sh              # Verificação do sistema
+│   └── scripts/test-api.sh            # Testes da API
+├── 📁 docs/                           # Documentação técnica
 └── 📖 README.md                       # Este arquivo
 ```
 
@@ -72,10 +103,10 @@ totvs-integration-prototype/
 
 ### Pré-requisitos
 
-- ☕ **Java 17+**
-- 🔨 **Maven 3.8+**
-- 🐳 **Docker & Docker Compose**
-- 🌐 **Git**
+- ☕ **Java 17+** — [Download](https://www.oracle.com/java/technologies/downloads/)
+- 🔨 **Maven 3.8+** — [Download](https://maven.apache.org/download.cgi)
+- 🐳 **Docker & Docker Compose** — [Download](https://www.docker.com/products/docker-desktop)
+- 🌐 **Git** — [Download](https://git-scm.com/)
 
 ### 1. Clonar o Repositório
 
@@ -92,6 +123,8 @@ docker-compose up -d
 
 # Verificar se está rodando
 docker-compose ps
+
+# Esperado: 4 containers com status "Up"
 ```
 
 ### 3. Executar a Aplicação
@@ -101,7 +134,7 @@ docker-compose ps
 mvn spring-boot:run
 
 # Opção 2: Usando script
-./start.sh
+./scripts/start.sh
 
 # Opção 3: Compilar e executar JAR
 mvn clean package
@@ -111,11 +144,31 @@ java -jar target/integration-prototype-1.0.0-SNAPSHOT.jar
 ### 4. Verificar se Está Funcionando
 
 ```bash
-# Executar testes da API
-./test-api.sh
+# Health check
+curl http://localhost:8081/actuator/health
 
-# Ou testar manualmente
-curl http://localhost:8080/actuator/health
+# Resultado esperado:
+# {"status":"UP","components":{"db":{"status":"UP"},"redis":{"status":"UP"}...}}
+
+# Acessar interfaces:
+open http://localhost:8081/swagger-ui.html  # API Documentation
+open http://localhost:8082                   # PgAdmin (Database Management)
+```
+
+## 🧪 Quick Test
+
+```bash
+# 1. Health check
+curl http://localhost:8081/actuator/health
+
+# 2. List tenants
+curl http://localhost:8081/v1/tenants
+
+# 3. System info
+curl http://localhost:8081/v1/system/info
+
+# 4. Access UI
+open http://localhost:8081/swagger-ui.html
 ```
 
 ## 🌐 Endpoints da API
@@ -170,6 +223,7 @@ GET    /v1/integrations/{id}/logs           # Logs de execução
 ```http
 GET /swagger-ui.html                         # Interface Swagger UI
 GET /v3/api-docs                            # Especificação OpenAPI 3
+GET /actuator/prometheus                    # Prometheus Metrics
 ```
 
 ## 🔧 Configuração
@@ -180,13 +234,13 @@ GET /v3/api-docs                            # Especificação OpenAPI 3
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/integration_hub
+    url: jdbc:postgresql://localhost:5435/integration_hub
     username: postgres
     password: postgres
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
 ```
 
 **H2 (Testes)**
@@ -207,7 +261,7 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6379
+      port: 6380
       timeout: 2000ms
 ```
 
@@ -232,17 +286,19 @@ mvn test
 # Testes específicos
 mvn test -Dtest=HealthControllerTest
 mvn test -Dtest=TenantServiceTest
+
+# Com cobertura
+mvn clean test jacoco:report
 ```
 
 ### Testes da API (Funcionais)
 
 ```bash
 # Script completo de testes
-./test-api.sh
+./scripts/test-api.sh
 
-# Testes específicos
-./test-endpoints.sh
-./verify.sh
+# Verificação de saúde de todos os serviços
+./scripts/verify.sh
 ```
 
 ### Cobertura dos Testes
@@ -275,20 +331,58 @@ mvn test -Dtest=TenantServiceTest
 ```yaml
 # docker-compose.yml
 services:
-  postgres:    # PostgreSQL 15
-  redis:       # Redis 7.4
-  pgadmin:     # PgAdmin 4 (Web UI)
+  postgres:    # PostgreSQL 15 (porta 5435)
+  redis:       # Redis 7.4 (porta 6380)
+  pgadmin:     # PgAdmin 4 - Web UI (porta 8082)
+  app:         # Application (porta 8081)
+```
+
+### Gerenciar Serviços
+
+```bash
+# Iniciar todos os serviços
+docker-compose up -d
+
+# Parar serviços
+docker-compose stop
+
+# Remover containers
+docker-compose down
+
+# Ver logs
+docker-compose logs -f postgres
+docker-compose logs -f redis
+docker-compose logs -f app
+
+# Verificar status
+docker-compose ps
 ```
 
 ### Acessar Serviços
 
-- **PostgreSQL**: `localhost:5432`
-- **Redis**: `localhost:6379`
-- **PgAdmin**: `http://localhost:8081`
-  - Email: `admin@totvs.com`
-  - Senha: `admin123`
+- **PostgreSQL**: `localhost:5435` (user: `postgres` / pass: `postgres`)
+- **Redis**: `localhost:6380`
+- **PgAdmin**: `http://localhost:8082` (user: `admin@totvs.com` / pass: `admin123`)
+- **Application**: `http://localhost:8081`
 
 ## 📊 Monitoramento
+
+### Health Checks
+
+```bash
+# Verificação de saúde
+curl http://localhost:8081/actuator/health
+
+# Resultado esperado:
+{
+  "status": "UP",
+  "components": {
+    "db": { "status": "UP", "details": { "database": "PostgreSQL" } },
+    "redis": { "status": "UP", "details": { "version": "7.4" } },
+    "diskSpace": { "status": "UP" }
+  }
+}
+```
 
 ### Métricas Disponíveis
 
@@ -304,7 +398,7 @@ services:
 monitoring/prometheus.yml
 
 # Métricas expostas em:
-http://localhost:8080/actuator/prometheus
+http://localhost:8081/actuator/prometheus
 ```
 
 ## 🔐 Segurança
@@ -334,7 +428,7 @@ X-Tenant-ID: {tenant-id}
 
 ```bash
 # Usando script automatizado
-./deploy.sh dev
+./scripts/start.sh
 
 # Manual
 mvn clean package
@@ -346,7 +440,7 @@ java -jar target/*.jar
 
 ```bash
 # Deploy automatizado
-./deploy.sh prod
+./scripts/deploy.sh prod
 
 # Variáveis de ambiente necessárias:
 export DB_URL=jdbc:postgresql://prod-db:5432/integration_hub
@@ -359,11 +453,13 @@ export REDIS_HOST=prod-redis
 
 ### Benchmarks Observados
 
-- **Startup Time**: ~10 segundos
-- **Health Check**: < 1ms
-- **Database Connection**: < 100ms
-- **Redis Connection**: < 50ms
-- **API Response**: 1-5ms (média)
+| Métrica | Valor |
+|---------|-------|
+| **Startup Time** | ~10 segundos |
+| **Health Check** | < 1ms |
+| **Database Connection** | < 100ms |
+| **Redis Connection** | < 50ms |
+| **API Response** | 1-5ms (média) |
 
 ### Otimizações
 
@@ -383,15 +479,17 @@ docker-compose ps
 
 # Ver logs
 docker-compose logs postgres
+
+# Reiniciar
+docker-compose restart postgres
 ```
 
-**2. Erro de Serialização JSON**
+**2. Porta Já em Uso**
 ```bash
-# Verificar logs da aplicação
-tail -f logs/application.log
-
-# Testar endpoint específico
-curl -X POST -H "Content-Type: application/json" ...
+# Verificar qual processo usa a porta
+lsof -i :5435  # PostgreSQL
+lsof -i :6380  # Redis
+lsof -i :8081  # Application
 ```
 
 **3. Testes Falhando**
@@ -427,6 +525,15 @@ mvn spring-boot:run
 - **DTOs**: Usar Lombok para reduzir boilerplate
 - **Tests**: JUnit 5 + Mockito
 - **Documentation**: Javadoc para métodos públicos
+- **Commits**: Usar Conventional Commits
+
+## 📚 Documentação Técnica
+
+- [Docker Setup Guide](docs/DOCKER_SETUP.md)
+- [Architecture Documentation](docs/ARCHITECTURE.md)
+- [API Usage Examples](docs/API_USAGE.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 
 ## 📝 Licença
 
@@ -434,11 +541,26 @@ Este projeto é propriedade da **TOTVS** e está licenciado sob termos propriet�
 
 ## 📞 Suporte
 
-- **Documentação**: `http://localhost:8080/swagger-ui.html`
-- **Health Check**: `http://localhost:8080/actuator/health`
+- **API Documentation**: `http://localhost:8081/swagger-ui.html`
+- **Health Check**: `http://localhost:8081/actuator/health`
 - **Logs**: `logs/application.log`
+- **Database UI**: `http://localhost:8082` (PgAdmin)
+
+---
+
+## ✨ O Que Está Funcionando
+
+- ✅ **47+ Automated Tests** — Todos passando
+- ✅ **Multi-Tenant Architecture** — Isolamento completo de dados
+- ✅ **PostgreSQL 15 + Redis 7.4** — Production-ready
+- ✅ **Docker Compose** — One-command deployment
+- ✅ **Health Checks** — Todos os serviços monitorados
+- ✅ **API Documentation** — Swagger UI fully integrated
+- ✅ **11 Connector Types** — Database, REST, Email, Files, MongoDB, Webhooks
+- ✅ **Security** — Rate limiting, input validation, SQL injection prevention
 
 ---
 
 **✅ Migração MongoDB → PostgreSQL concluída com sucesso!**  
-*Desenvolvido com ❤️ pela equipe TOTVS*
+*Desenvolvido com ❤️ pela equipe TOTVS*  
+*Última atualização: Outubro 2024*

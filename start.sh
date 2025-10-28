@@ -1,236 +1,206 @@
 #!/bin/bash
 
-# TOTVS Integration Hub - Script de Inicialização
-echo "🚀 TOTVS Integration Hub - Startup Script"
-echo "=========================================="
+# ============================================================================
+# START.SH - Start TOTVS Integration Hub with Docker
+# Usage: ./start.sh [dev|prod]
+# ============================================================================
 
-# Cores para output
+set -e
+
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Função para logs coloridos
-log_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
+# Configuration
+ENVIRONMENT=${1:-dev}
+DOCKER_COMPOSE_FILE="docker-compose.yml"
+
+# Functions
+print_header() {
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}========================================${NC}"
 }
 
-log_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
 }
 
-log_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
 }
 
-log_error() {
-    echo -e "${RED}❌ $1${NC}"
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
 }
 
-# Verificar pré-requisitos
-check_prerequisites() {
-    log_info "Verificando pré-requisitos..."
+check_requirements() {
+    print_header "Checking Requirements"
     
-    # Verificar Java 17
-    if command -v java &> /dev/null; then
-        JAVA_VERSION=$(java -version 2>&1 | head -n1 | cut -d'"' -f2 | cut -d'.' -f1)
-        if [ "$JAVA_VERSION" -ge "17" ]; then
-            log_success "Java $JAVA_VERSION encontrado"
-        else
-            log_error "Java 17+ é necessário. Versão atual: $JAVA_VERSION"
-            exit 1
-        fi
-    else
-        log_error "Java não encontrado. Instale Java 17+"
+    # Check Docker
+    if ! command -v docker &> /dev/null; then
+        print_error "Docker is not installed. Please install Docker first."
         exit 1
     fi
+    print_success "Docker is installed"
     
-    # Verificar Maven
-    if command -v mvn &> /dev/null; then
-        MVN_VERSION=$(mvn -version 2>&1 | head -n1 | cut -d' ' -f3)
-        log_success "Maven $MVN_VERSION encontrado"
-    else
-        log_error "Maven não encontrado. Instale Maven 3.9+"
+    # Check Docker Compose
+    if ! command -v docker-compose &> /dev/null; then
+        print_error "Docker Compose is not installed. Please install Docker Compose first."
         exit 1
     fi
+    print_success "Docker Compose is installed"
     
-    # Verificar Docker
-    if command -v docker &> /dev/null; then
-        DOCKER_VERSION=$(docker --version | cut -d' ' -f3 | cut -d',' -f1)
-        log_success "Docker $DOCKER_VERSION encontrado"
-    else
-        log_error "Docker não encontrado. Instale Docker"
+    # Check if docker-compose file exists
+    if [ ! -f "$DOCKER_COMPOSE_FILE" ]; then
+        print_error "docker-compose.yml not found in current directory"
         exit 1
     fi
-    
-    # Verificar Docker Compose
-    if command -v docker-compose &> /dev/null; then
-        COMPOSE_VERSION=$(docker-compose --version | cut -d' ' -f3 | cut -d',' -f1)
-        log_success "Docker Compose $COMPOSE_VERSION encontrado"
-    else
-        log_error "Docker Compose não encontrado"
-        exit 1
-    fi
+    print_success "docker-compose.yml found"
 }
 
-# Função para setup da infraestrutura
-setup_infrastructure() {
-    log_info "Configurando infraestrutura..."
+start_docker_services() {
+    print_header "Starting Docker Services"
     
-    # Parar containers existentes
-    log_info "Parando containers existentes..."
+    # Stop existing containers (if any)
+    echo "Stopping existing containers..."
     docker-compose down 2>/dev/null || true
     
-    # Iniciar MongoDB e Redis
-    log_info "Iniciando MongoDB e Redis..."
-    docker-compose up -d mongodb redis
+    # Start services
+    echo "Starting PostgreSQL, Redis, and PgAdmin..."
+    docker-compose up -d
     
-    # Aguardar containers estarem prontos
-    log_info "Aguardando containers ficarem prontos..."
-    sleep 15
+    # Wait for services to be ready
+    echo "Waiting for services to be ready..."
+    sleep 5
     
-    # Verificar MongoDB
-    log_info "Verificando MongoDB..."
+    # Check PostgreSQL
+    echo -n "Checking PostgreSQL... "
     for i in {1..30}; do
-        if docker-compose exec -T mongodb mongosh --eval "db.adminCommand('ping')" &>/dev/null; then
-            log_success "MongoDB está pronto"
+        if docker exec integration-postgres pg_isready -U postgres &> /dev/null; then
+            print_success "PostgreSQL is ready"
             break
         fi
         if [ $i -eq 30 ]; then
-            log_error "MongoDB não respondeu após 30 tentativas"
+            print_error "PostgreSQL failed to start"
             exit 1
         fi
-        sleep 2
+        echo -n "."
+        sleep 1
     done
     
-    # Verificar Redis
-    log_info "Verificando Redis..."
+    # Check Redis
+    echo -n "Checking Redis... "
     for i in {1..30}; do
-        if docker-compose exec -T redis redis-cli -a redis123 ping | grep -q PONG; then
-            log_success "Redis está pronto"
+        if docker exec integration-redis redis-cli ping &> /dev/null; then
+            print_success "Redis is ready"
             break
         fi
         if [ $i -eq 30 ]; then
-            log_error "Redis não respondeu após 30 tentativas"
+            print_error "Redis failed to start"
             exit 1
         fi
-        sleep 2
+        echo -n "."
+        sleep 1
     done
 }
 
-# Função para build da aplicação
-build_application() {
-    log_info "Fazendo build da aplicação..."
+start_application() {
+    print_header "Starting Application"
     
-    # Limpar target anterior
-    log_info "Limpando build anterior..."
-    mvn clean -q
-    
-    # Compilar aplicação
-    log_info "Compilando aplicação..."
-    if mvn compile -q; then
-        log_success "Compilação concluída"
-    else
-        log_error "Erro na compilação"
-        exit 1
+    # Check if Maven is installed
+    if ! command -v mvn &> /dev/null; then
+        print_warning "Maven is not installed. You need to run:"
+        echo "  mvn clean package"
+        echo "  java -jar target/integration-prototype-1.0.0-SNAPSHOT.jar"
+        return
     fi
+    
+    # Build and start with Maven
+    echo "Building application with Maven..."
+    mvn clean spring-boot:run -DskipTests -P$ENVIRONMENT
 }
 
-# Função para executar aplicação
-run_application() {
-    log_info "Iniciando aplicação..."
+show_services_info() {
+    print_header "Services Information"
     
-    # Configurar variáveis de ambiente
-    export SPRING_PROFILES_ACTIVE=dev
-    export JAVA_OPTS="-Xmx512m -Xms256m"
-    
-    # Executar aplicação
-    log_success "🎉 Iniciando TOTVS Integration Hub..."
-    echo ""
-    echo "📍 URLs importantes:"
-    echo "   • Aplicação: http://localhost:8080/api"
-    echo "   • Health Check: http://localhost:8080/api/v1/health"
-    echo "   • Swagger UI: http://localhost:8080/api/swagger-ui.html"
-    echo "   • Tipos Conectores: http://localhost:8080/api/connectors/types"
-    echo "   • MongoDB: mongodb://admin:password123@localhost:27017"
-    echo "   • Redis: redis://localhost:6379 (senha: redis123)"
-    echo ""
-    echo "🛑 Para parar: Ctrl+C"
+    echo -e "${BLUE}PostgreSQL:${NC}"
+    echo "  Host: localhost:5433"
+    echo "  Database: integration_hub"
+    echo "  User: postgres"
+    echo "  Password: postgres"
     echo ""
     
-    # Executar com Spring Boot
-    mvn spring-boot:run
-}
-
-# Função para executar testes funcionais
-run_functional_tests() {
-    log_info "Executando testes funcionais..."
+    echo -e "${BLUE}Redis:${NC}"
+    echo "  Host: localhost:6379"
+    echo ""
     
-    if [ -f "run-tests.py" ]; then
-        python3 run-tests.py --url http://localhost:8080/api
-    else
-        log_warning "Script de testes funcionais não encontrado"
-    fi
+    echo -e "${BLUE}PgAdmin:${NC}"
+    echo "  URL: http://localhost:8081"
+    echo "  Email: admin@totvs.com"
+    echo "  Password: admin123"
+    echo ""
+    
+    echo -e "${BLUE}Application:${NC}"
+    echo "  URL: http://localhost:8080"
+    echo "  API Docs: http://localhost:8080/swagger-ui.html"
+    echo "  Health: http://localhost:8080/actuator/health"
 }
 
-# Função de limpeza
-cleanup() {
-    log_info "Fazendo limpeza..."
-    docker-compose down
-    log_success "Limpeza concluída"
+show_troubleshooting() {
+    print_header "Troubleshooting"
+    
+    echo "If services fail to start:"
+    echo ""
+    echo "1. Check Docker is running:"
+    echo "   docker ps"
+    echo ""
+    echo "2. View logs:"
+    echo "   docker-compose logs -f postgres"
+    echo "   docker-compose logs -f redis"
+    echo ""
+    echo "3. Stop and clean up:"
+    echo "   docker-compose down -v"
+    echo ""
+    echo "4. Rebuild everything:"
+    echo "   docker-compose up --build"
 }
 
-# Função principal
+# Main execution
 main() {
-    echo "🎯 Escolha uma opção:"
-    echo "1) Setup completo (infra + build + run)"
-    echo "2) Apenas infraestrutura"
-    echo "3) Apenas build"
-    echo "4) Apenas executar"
-    echo "5) Testes funcionais"
-    echo "6) Limpeza"
-    echo "0) Sair"
-    echo ""
-    read -p "Opção: " choice
+    clear
     
-    case $choice in
-        1)
-            check_prerequisites
-            setup_infrastructure
-            build_application
-            run_application
-            ;;
-        2)
-            check_prerequisites
-            setup_infrastructure
-            ;;
-        3)
-            check_prerequisites
-            build_application
-            ;;
-        4)
-            run_application
-            ;;
-        5)
-            run_functional_tests
-            ;;
-        6)
-            cleanup
-            ;;
-        0)
-            log_info "Saindo..."
-            exit 0
-            ;;
-        *)
-            log_error "Opção inválida"
-            exit 1
-            ;;
-    esac
+    echo -e "${BLUE}"
+    echo "╔════════════════════════════════════════╗"
+    echo "║  TOTVS Integration Hub - Start Script  ║"
+    echo "║  Environment: $ENVIRONMENT                     ║"
+    echo "╚════════════════════════════════════════╝"
+    echo -e "${NC}"
+    
+    check_requirements
+    start_docker_services
+    show_services_info
+    
+    # Try to start application
+    echo ""
+    read -p "Start application now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        start_application
+    else
+        print_success "Docker services are running!"
+        print_warning "To start the application manually, run:"
+        echo "  mvn clean spring-boot:run"
+        echo "  or"
+        echo "  java -jar target/integration-prototype-1.0.0-SNAPSHOT.jar"
+    fi
 }
 
-# Trap para limpeza em caso de interrupção
-trap cleanup EXIT
+# Handle Ctrl+C
+trap 'echo -e "\n${YELLOW}Interrupted. Services are still running.${NC}"; exit 0' INT
 
-# Executar função principal
+# Run main function
 main

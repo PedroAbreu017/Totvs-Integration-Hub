@@ -1,17 +1,18 @@
-# Compiled class file
+# ============================================================================
+# .GITIGNORE - TOTVS Integration Hub
+# Ignore files that shouldn't be in version control
+# ============================================================================
+
+# ========== COMPILED FILES ==========
 *.class
-
-# Log files
-*.log
-logs/
-
-# BlueJ files
 *.ctxt
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+# ========== LOG FILES ==========
+*.log
+logs/
+spring-boot-*.log
 
-# Package Files
+# ========== ARCHIVE FILES ==========
 *.jar
 *.war
 *.nar
@@ -20,10 +21,11 @@ logs/
 *.tar.gz
 *.rar
 
-# Virtual machine crash logs
+# ========== VIRTUAL MACHINE ==========
 hs_err_pid*
+.attach_pid*
 
-# Maven
+# ========== MAVEN ==========
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -35,44 +37,95 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
-# IDE
+# ========== GRADLE ==========
+.gradle/
+build/
+gradle/
+*.gradle
+
+# ========== IDE - IntelliJ ==========
 .idea/
 *.iws
 *.iml
 *.ipr
+out/
+.idea_modules/
+
+# ========== IDE - VS Code ==========
 .vscode/
+*.code-workspace
+
+# ========== IDE - Eclipse ==========
 .eclipse/
 .metadata/
 .project
 .classpath
 .settings/
+bin/
 
-# OS
+# ========== IDE - NetBeans ==========
+nbproject/
+*.nbproject
+
+# ========== OS SPECIFIC ==========
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+$RECYCLE.BIN/
 
-# Application specific
+# ========== APPLICATION SPECIFIC ==========
 application-local.yml
 application-secrets.yml
-*.env
-.env
+application-prod.yml
+application-production.yml
 
-# Docker
+# ========== ENVIRONMENT & SECRETS ==========
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+
+# ========== DOCKER ==========
 docker-compose.override.yml
 
-# Temporary files
+# ========== TEMPORARY FILES ==========
 *.tmp
 *.bak
 *.swp
 *.swo
 *~
+.history/
+.local/
 
-# Database
+# ========== DATABASE ==========
 *.db
 *.sqlite
-
-# Redis dump
+*.sqlite3
+.h2.server.properties
 dump.rdb
 
-# Spring Boot
-spring-boot-*.log
+# ========== CODE COVERAGE ==========
+coverage/
+jacoco.exec
+*.gc*
+
+# ========== FRONTEND (if using) ==========
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ========== BUILD & DIST ==========
+dist/
+site/
+build/
+*.patch
+
+# ========== MISC ==========
+.attach_pid*
+*.orig

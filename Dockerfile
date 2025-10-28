@@ -1,84 +1,62 @@
-# ==============================================================================
-# DOCKERFILE DEFINITIVO - TOTVS INTEGRATION HUB
-# ==============================================================================
+# ============================================================================
+# DOCKERFILE - TOTVS Integration Hub
+# Multi-stage build for optimal image size and security
+# ============================================================================
 
-# Stage 1: Build da aplicação
-FROM maven:3.9.6-eclipse-temurin-17 AS builder
-WORKDIR /app
+# Stage 1: Build
+FROM maven:3.9-eclipse-temurin-17 AS builder
 
-# Copiar pom.xml primeiro (cache de dependências)
+WORKDIR /build
+
+# Copy project files
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+COPY src ./src
 
-# Copiar código fonte e compilar
-COPY src/ src/
-RUN mvn clean package -DskipTests -B
+# Build application
+RUN mvn clean package -DskipTests -q
 
-# Stage 2: Runtime otimizado
+# Stage 2: Runtime
 FROM eclipse-temurin:17-jre-alpine
 
 LABEL maintainer="TOTVS Integration Team"
-LABEL version="1.0.0"
 LABEL description="TOTVS Integration Hub - Enterprise Integration Platform"
 
-# Criar usuário não-root
-RUN addgroup -g 1001 -S totvs && \
-    adduser -u 1001 -S totvs -G totvs
+# Install curl for health checks
+RUN apk add --no-cache curl
 
-# Instalar dependências
-RUN apk add --no-cache curl tzdata netcat-openbsd && \
-    rm -rf /var/cache/apk/*
-
-# Configurar timezone
-ENV TZ=America/Sao_Paulo
-
-# Criar diretórios
-RUN mkdir -p /app/logs /app/config /app/data && \
-    chown -R totvs:totvs /app
+# Create non-root user
+RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
 
 WORKDIR /app
 
-# Copiar JAR da aplicação
-COPY --from=builder --chown=totvs:totvs /app/target/*.jar app.jar
+# Copy built jar from builder stage
+COPY --from=builder /build/target/integration-prototype-1.0.0-SNAPSHOT.jar app.jar
 
-# ==========================================
-# CONFIGURAÇÕES FORÇADAS PARA RESOLVER O BUG
-# ==========================================
+# Change ownership
+RUN chown -R appuser:appuser /app
 
-# Configurações JVM otimizadas
-ENV JAVA_OPTS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
+# Switch to non-root user
+USER appuser
 
-# FORÇAR configurações MongoDB e Redis via ENV
-ENV SPRING_PROFILES_ACTIVE=production
-ENV SERVER_PORT=8080
-
-# Expor porta
+# Expose port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# Trocar para usuário não-root
-USER totvs:totvs
+# Start application
+ENTRYPOINT ["java"]
+CMD ["-Xmx512m", "-Xms256m", "-XX:+UseG1GC", "-jar", "app.jar"]
 
-# ==========================================
-# ENTRYPOINT FORÇADO PARA RESOLVER O BUG
-# ==========================================
-ENTRYPOINT ["sh", "-c", "\
-echo '🚀 Starting TOTVS Integration Hub...' && \
-echo '📡 MongoDB URI: '$SPRING_DATA_MONGODB_URI && \
-echo '📦 Redis Host: '$SPRING_DATA_REDIS_HOST && \
-java $JAVA_OPTS \
--Dspring.profiles.active=production \
--Dspring.data.mongodb.uri=${SPRING_DATA_MONGODB_URI:-mongodb://admin:totvs123456789@totvs-mongodb:27017/totvs_integration?authSource=admin} \
--Dspring.data.mongodb.database=${SPRING_DATA_MONGODB_DATABASE:-totvs_integration} \
--Dspring.data.redis.host=${SPRING_DATA_REDIS_HOST:-totvs-redis} \
--Dspring.data.redis.port=${SPRING_DATA_REDIS_PORT:-6379} \
--Dspring.data.redis.password=${SPRING_DATA_REDIS_PASSWORD:-totvs123456789} \
--Dspring.cache.type=redis \
--Dapp.description='Hub de integração para sistemas TOTVS' \
--Dserver.port=8080 \
--Dmanagement.endpoints.web.exposure.include=health,info,metrics \
--Dmanagement.endpoint.health.show-details=always \
--jar app.jar"]
+# ============================================================================
+# Build instructions:
+#   docker build -t totvs-integration-hub:latest .
+#
+# Run instructions:
+#   docker run -d \
+#     -p 8080:8080 \
+#     -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/integration_hub \
+#     -e SPRING_DATA_REDIS_HOST=host.docker.internal \
+#     totvs-integration-hub:latest
+# ============================================================================

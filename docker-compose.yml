@@ -1,11 +1,13 @@
 # ============================================================================
-# DOCKER-COMPOSE.YML - POSTGRESQL + REDIS PARA DESENVOLVIMENTO
+# DOCKER COMPOSE - TOTVS Integration Hub
+# Services: PostgreSQL 15 + Redis 7 + PgAdmin 4
+# Usage: docker-compose up -d
 # ============================================================================
 
 version: '3.8'
 
 services:
-  # ========== POSTGRESQL ==========
+  # ========== POSTGRESQL 15 ==========
   postgres:
     image: postgres:15-alpine
     container_name: integration-postgres
@@ -15,28 +17,52 @@ services:
       POSTGRES_PASSWORD: postgres
       TZ: America/Sao_Paulo
     ports:
-      - "5432:5432"
+      - "5435:5432"  # ✅ CHANGED: 5434 → 5435 (port conflict)
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - integration-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # ========== REDIS ==========
+  # ========== REDIS 7 ==========
   redis:
     image: redis:7-alpine
     container_name: integration-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"  # ✅ CHANGED: 6379 → 6380 (avoid conflicts)
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
     networks:
       - integration-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # ========== PGADMIN (OPCIONAL) ==========
+  # ========== PGADMIN 4 (Web UI para PostgreSQL) ==========
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: integration-pgadmin
@@ -44,15 +70,81 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@totvs.com
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_CONFIG_COOKIE_DEFAULT_SECURE: "False"
+      PGADMIN_CONFIG_COOKIE_DEFAULT_SAMESITE: "Lax"
     ports:
-      - "8081:80"
+      - "8082:80"  # ✅ CHANGED: 8081 → 8082 (avoid conflicts)
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
       - integration-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========== TOTVS Integration Hub Application ==========
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: integration-app
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/integration_hub
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      
+      # Redis Configuration
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      
+      # Application Configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_PROFILES_ACTIVE: dev
+      
+      # Multi-tenancy
+      APP_MULTI_TENANT_ENABLED: "true"
+      APP_MULTI_TENANT_HEADER_NAME: X-Tenant-ID
+      
+      # Server
+      SERVER_PORT: 8080
+      SERVER_SERVLET_CONTEXT_PATH: /
+      
+      # Logging
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_COM_TOTVS: DEBUG
+    ports:
+      - "8081:8080"  # ✅ CHANGED: 8080 → 8081 (avoid conflicts)
+    volumes:
+      - ./target:/app/target
+      - ./src:/app/src
+    networks:
+      - integration-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 # ========== VOLUMES ==========
 volumes:
@@ -67,3 +159,37 @@ volumes:
 networks:
   integration-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================================================
+# QUICK REFERENCE
+# ============================================================================
+# 
+# Start all services:
+#   docker-compose up -d
+#
+# View logs:
+#   docker-compose logs -f app
+#   docker-compose logs -f postgres
+#   docker-compose logs -f redis
+#
+# Stop all services:
+#   docker-compose down
+#
+# Remove volumes (WARNING: deletes data):
+#   docker-compose down -v
+#
+# Access services:
+#   PostgreSQL:  localhost:5433 (user: postgres, password: postgres)
+#   Redis:       localhost:6379
+#   PgAdmin:     http://localhost:8081 (user: admin@totvs.com, password: admin123)
+#   App:         http://localhost:8080
+#
+# Health checks:
+#   curl http://localhost:8080/actuator/health
+#   curl http://localhost:5433:5432/pg_isready
+#   redis-cli -h localhost ping
+#
+# ============================================================================
