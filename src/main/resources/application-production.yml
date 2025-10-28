@@ -1,103 +1,203 @@
-# ==============================================================================
-# CONFIGURAÇÃO DE PRODUÇÃO - TOTVS INTEGRATION HUB (PostgreSQL)
-# ==============================================================================
-
 spring:
+  # ========== APPLICATION NAME ==========
   application:
     name: totvs-integration-hub
 
-  # DATABASE - POSTGRESQL
+  # ========== PROFILES ==========
+  profiles:
+    active: production
+
+  # ========== DATASOURCE (PostgreSQL via Railway) ==========
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://totvs-postgres:5432/totvs_integration}
-    username: ${SPRING_DATASOURCE_USERNAME:totvs}
-    password: ${SPRING_DATASOURCE_PASSWORD:totvs123456789}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/integration_hub}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
-    
-  # JPA/HIBERNATE
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      auto-commit: true
+
+  # ========== JPA / HIBERNATE ==========
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database: postgresql
     hibernate:
-      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+      ddl-auto: validate  # IMPORTANT: Don't auto-create in production!
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        use_sql_comments: false
         jdbc:
-          time_zone: America/Sao_Paulo
-      
-  # CACHE - REDIS
+          time_zone: UTC
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
+  # ========== REDIS (via Railway) ==========
   data:
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:totvs-redis}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
-      password: ${SPRING_DATA_REDIS_PASSWORD:totvs123456789}
-      timeout: 3000ms
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6380}
+      timeout: 2000ms
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      database: 0
       lettuce:
         pool:
-          max-active: 20
-          max-idle: 10
-          min-idle: 5
-          max-wait: 2000ms
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: -1ms
+        shutdown-timeout: 200ms
 
-  # CACHE TYPE
   cache:
     type: redis
+    redis:
+      time-to-live: 3600000  # 1 hour
+      cache-null-values: false
 
-# MANAGEMENT & MONITORING
+  # ========== JACKSON (JSON Serialization) ==========
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+  # ========== WEB MVC ==========
+  web:
+    resources:
+      cache:
+        period: 3600
+
+# ========== SERVER CONFIGURATION ==========
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+    session:
+      timeout: 30m
+  compression:
+    enabled: true
+    min-response-size: 1024
+  error:
+    include-message: always
+    include-binding-errors: always
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    max-connections: 10000
+    accept-count: 100
+    connection-timeout: 20000ms
+
+# ========== APPLICATION CONFIGURATION ==========
+app:
+  name: "TOTVS Integration Hub"
+  version: "1.0.0"
+  description: "Enterprise Integration Platform - Multi-tenant"
+  environment: "production"
+  
+  # Multi-tenancy
+  multi-tenant:
+    enabled: ${APP_MULTI_TENANT_ENABLED:true}
+    header-name: ${APP_MULTI_TENANT_HEADER_NAME:X-Tenant-ID}
+    default-tenant: ${APP_MULTI_TENANT_DEFAULT_TENANT:default}
+    strict-mode: true  # Stricter in production
+  
+  # Security
+  security:
+    api-key:
+      header-name: "X-API-Key"
+      enabled: false
+      required: false
+    jwt:
+      secret: ${JWT_SECRET:default-change-in-prod}
+      expiration: 86400  # 24 hours
+      enabled: true
+    rate-limit:
+      enabled: ${APP_SECURITY_RATE_LIMIT_ENABLED:true}
+      requests-per-minute: ${APP_SECURITY_RATE_LIMIT_REQUESTS_PER_MINUTE:1000}
+  
+  # Connector settings
+  connector:
+    timeout: 30000ms
+    retry-attempts: 3
+    retry-delay: 1000ms
+
+# ========== LOGGING ==========
+logging:
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.totvs.integration: ${LOGGING_LEVEL_COM_TOTVS_INTEGRATION:INFO}
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.springframework.data: WARN
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /tmp/application.log
+    max-size: 10MB
+    max-history: 5
+
+# ========== MANAGEMENT (ACTUATOR) ==========
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus,env,configprops
+      base-path: /actuator
   endpoint:
     health:
       show-details: always
-
-# SERVER CONFIGURATION
-server:
-  port: ${SERVER_PORT:8080}
-  servlet:
-    encoding:
-      charset: UTF-8
+      show-components: always
+      probes:
+        enabled: true
+    metrics:
       enabled: true
-      force: true
+    prometheus:
+      enabled: true
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    redis:
+      enabled: true
+    diskspace:
+      enabled: true
 
-# LOGGING
-logging:
-  level:
-    com.totvs.integration: ${LOGGING_LEVEL_COM_TOTVS_INTEGRATION:INFO}
-    org.springframework: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:WARN}
-    org.hibernate.SQL: WARN
-    org.hibernate.type.descriptor.sql.BasicBinder: WARN
-    root: WARN
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
-
-# APPLICATION PROPERTIES
-app:
-  name: ${APP_NAME:TOTVS Integration Hub}
-  version: ${APP_VERSION:1.0.0}
-  description: ${APP_DESCRIPTION:Hub de integração para sistemas TOTVS}
-  
-  # MULTI-TENANT CONFIGURATION
-  multi-tenant:
-    enabled: ${APP_MULTI_TENANT_ENABLED:true}
-    default-tenant: ${APP_MULTI_TENANT_DEFAULT_TENANT:default}
-    header-name: ${APP_MULTI_TENANT_HEADER_NAME:X-Tenant-ID}
-    enforce-header: ${APP_MULTI_TENANT_ENFORCE_HEADER:false}
-    
-  # SECURITY CONFIGURATION
-  security:
-    api-key:
-      enabled: ${APP_SECURITY_API_KEY_ENABLED:false}
-      header-name: ${APP_SECURITY_API_KEY_HEADER:X-API-Key}
-    jwt:
-      secret: ${APP_SECURITY_JWT_SECRET:my-super-secret-jwt-key-for-totvs-integration}
-      expiration: ${APP_SECURITY_JWT_EXPIRATION:86400}
-
-# SWAGGER/OPENAPI
+# ========== SPRINGDOC (OpenAPI/Swagger) ==========
 springdoc:
   api-docs:
-    path: ${SPRINGDOC_API_DOCS_PATH:/api-docs}
+    enabled: true
+    path: /v3/api-docs
+    version: OPENAPI_3_0
   swagger-ui:
-    path: ${SPRINGDOC_SWAGGER_UI_PATH:/swagger-ui.html}
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    url: /v3/api-docs
+    operations-sorter: method
+    tags-sorter: alpha
+    syntax-highlight:
+      activate: true
+      theme: monokai
+
+# ========== INFO ENDPOINT ==========
+info:
+  app:
+    name: TOTVS Integration Hub
+    description: Enterprise Integration Platform API
+    version: 1.0.0
+  company:
+    name: TOTVS
+    website: https://www.totvs.com

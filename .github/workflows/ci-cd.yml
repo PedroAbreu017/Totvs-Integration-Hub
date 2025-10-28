@@ -1,0 +1,128 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: integration_hub_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      # 1. Checkout código
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      # 2. Setup Java 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      # 3. Build (compile)
+      - name: Build with Maven
+        run: mvn -B clean compile
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+      
+      # 4. Run Tests
+      - name: Run Tests
+        run: mvn -B test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+      
+      # 5. Upload Test Results
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: target/surefire-reports/
+      
+      # 6. Build Package (for Docker)
+      - name: Build Package
+        run: mvn -B package -DskipTests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
+          SPRING_DATA_REDIS_HOST: localhost
+      
+      # 7. Build Docker Image (for Docker Hub push)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: totvs-integration-hub:latest
+          load: true
+      
+      # 8. Generate Build Report
+      - name: Test Summary
+        run: |
+          echo "## Build Report 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Build Status**: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Tests**: $(find target/surefire-reports -name '*.xml' | wc -l) files found" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Docker Image**: Built successfully" >> $GITHUB_STEP_SUMMARY
+
+  notify-success:
+    needs: build
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - name: Notify Success
+        run: echo "✅ CI/CD Pipeline completed successfully!"
+
+  notify-failure:
+    needs: build
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+      - name: Notify Failure
+        run: echo "❌ CI/CD Pipeline failed! Check logs above."

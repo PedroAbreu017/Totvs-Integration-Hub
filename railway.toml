@@ -1,0 +1,84 @@
+# ============================================================================
+# RAILWAY.TOML - TOTVS Integration Hub
+# Railway deployment configuration
+# https://docs.railway.app
+# ============================================================================
+
+[build]
+# Use Dockerfile in project root (YOUR CURRENT DOCKERFILE)
+builder = "dockerfile"
+dockerfile = "Dockerfile"
+
+[deploy]
+# Restart policy for failed containers
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Health check configuration (matches Dockerfile HEALTHCHECK)
+healthchecks.enabled = true
+
+[env]
+# Spring Boot active profile
+SPRING_PROFILES_ACTIVE = "production"
+
+# Application port (must match Dockerfile EXPOSE)
+PORT = "8080"
+
+# Logging
+LOGGING_LEVEL_ROOT = "INFO"
+LOGGING_LEVEL_COM_TOTVS_INTEGRATION = "DEBUG"
+
+# Multi-tenant configuration
+APP_MULTI_TENANT_ENABLED = "true"
+APP_MULTI_TENANT_DEFAULT_TENANT = "default"
+APP_MULTI_TENANT_HEADER_NAME = "X-Tenant-ID"
+
+# Rate limiting
+APP_SECURITY_RATE_LIMIT_ENABLED = "true"
+APP_SECURITY_RATE_LIMIT_REQUESTS_PER_MINUTE = "1000"
+
+# ============================================================================
+# DATABASE CONNECTION (Automatic via Railway PostgreSQL Plugin)
+# ============================================================================
+# When you add PostgreSQL service in Railway, these are set automatically:
+# - SPRING_DATASOURCE_URL
+# - SPRING_DATASOURCE_USERNAME
+# - SPRING_DATASOURCE_PASSWORD
+# - SPRING_JPA_HIBERNATE_DDL_AUTO = validate (don't auto-create tables in prod!)
+
+[env.database]
+SPRING_JPA_HIBERNATE_DDL_AUTO = "validate"
+SPRING_JPA_SHOW_SQL = "false"
+SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL = "true"
+
+# ============================================================================
+# REDIS CONNECTION (Automatic via Railway Redis Plugin)
+# ============================================================================
+# When you add Redis service in Railway, these are set automatically:
+# - SPRING_DATA_REDIS_HOST
+# - SPRING_DATA_REDIS_PORT
+# - SPRING_REDIS_PASSWORD (if set)
+
+[env.cache]
+SPRING_CACHE_TYPE = "redis"
+SPRING_DATA_REDIS_TIMEOUT = "2000ms"
+SPRING_DATA_REDIS_DATABASE = "0"
+
+# ============================================================================
+# NOTES FOR DEPLOYMENT
+# ============================================================================
+# 1. Add PostgreSQL service:
+#    - Railway → Add Service → PostgreSQL
+#    - Database name will be auto-created as "integration_hub"
+#
+# 2. Add Redis service:
+#    - Railway → Add Service → Redis
+#    - All connection details auto-configured
+#
+# 3. Environment variables will be auto-populated from connected services
+#
+# 4. Health check endpoint: /actuator/health
+#    Railway monitors this endpoint automatically
+#
+# 5. Logs available at: Railway Dashboard → Logs tab
+# ============================================================================
