@@ -5,7 +5,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
+
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
@@ -78,15 +81,15 @@ public class ExecutionLog {
     
     
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "source_stats", columnDefinition = "TEXT")
     private Map<String, Object> sourceStats;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "target_stats", columnDefinition = "TEXT")
     private Map<String, Object> targetStats;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "metadata", columnDefinition = "TEXT")
     private Map<String, Object> metadata;
     

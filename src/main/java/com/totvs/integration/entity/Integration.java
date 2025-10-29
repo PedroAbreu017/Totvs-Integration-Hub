@@ -5,7 +5,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
+
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
@@ -39,27 +42,27 @@ public class Integration {
     
     
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "source_connector", columnDefinition = "TEXT")
     private ConnectorConfig sourceConnector;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "target_connector", columnDefinition = "TEXT")
     private ConnectorConfig targetConnector;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "transformation", columnDefinition = "TEXT")
     private DataTransformation transformation;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "schedule", columnDefinition = "TEXT")
     private ScheduleConfig schedule;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "configuration", columnDefinition = "TEXT")
     private Map<String, Object> configuration;
     
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(name = "tags", columnDefinition = "TEXT")
     private List<String> tags;
     
