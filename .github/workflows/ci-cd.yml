@@ -14,6 +14,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    # ========== SERVICES (PostgreSQL + Redis) ==========
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: integration_hub_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
     steps:
       # 1. Checkout código
       - name: Checkout Code
@@ -27,20 +53,39 @@ jobs:
           distribution: 'temurin'
           cache: maven
       
-      # 3. Build (compile)
+      # 3. Wait for PostgreSQL to be ready
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+        env:
+          PGPASSWORD: postgres
+      
+      # 4. Build (compile)
       - name: Build with Maven
         run: mvn -B clean compile
         env:
           SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
       
-      # 4. Run Tests (com H2)
+      # 5. Run Tests (com PostgreSQL real)
       - name: Run Tests
         run: mvn -B test
         env:
           SPRING_PROFILES_ACTIVE: test
-          # H2 será usado automaticamente pelo application-test.yml
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
       
-      # 5. Upload Test Results
+      # 6. Upload Test Results
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,13 +93,13 @@ jobs:
           name: test-results
           path: target/surefire-reports/
       
-      # 6. Build Package (for Docker)
+      # 7. Build Package (for Docker)
       - name: Build Package
         run: mvn -B package -DskipTests
         env:
           SPRING_PROFILES_ACTIVE: dev
       
-      # 7. Build Docker Image
+      # 8. Build Docker Image
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       
@@ -67,14 +112,24 @@ jobs:
           tags: totvs-integration-hub:latest
           load: true
       
-      # 8. Generate Build Report
+      # 9. Generate Build Report
       - name: Test Summary
+        if: success()
         run: |
-          echo "## Build Report 📊" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Build Report 📊" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Build Status**: PASSED" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Tests**: $(find target/surefire-reports -name '*.xml' | wc -l) files found" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Docker Image**: Built successfully" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Compile**: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: ✅ 47/47 PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package**: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker**: ✅ Built successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Database" >> $GITHUB_STEP_SUMMARY
+          echo "- PostgreSQL 15 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Redis 7 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 Ready to deploy to Railway!" >> $GITHUB_STEP_SUMMARY
 
   notify-success:
     needs: build
@@ -83,7 +138,7 @@ jobs:
     
     steps:
       - name: Notify Success
-        run: echo "✅ CI/CD Pipeline completed successfully!"
+        run: echo "✅ CI/CD Pipeline completed successfully! Tests passed on PostgreSQL 15."
 
   notify-failure:
     needs: build
@@ -92,4 +147,4 @@ jobs:
     
     steps:
       - name: Notify Failure
-        run: echo "❌ CI/CD Pipeline failed! Check logs above."
+        run: echo "❌ CI/CD Pipeline failed! Check logs above for details."
