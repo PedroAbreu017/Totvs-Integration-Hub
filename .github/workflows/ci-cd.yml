@@ -14,31 +14,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_DB: integration_hub_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-    
     steps:
       # 1. Checkout código
       - name: Checkout Code
@@ -56,21 +31,14 @@ jobs:
       - name: Build with Maven
         run: mvn -B clean compile
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
-          SPRING_DATASOURCE_USERNAME: postgres
-          SPRING_DATASOURCE_PASSWORD: postgres
-          SPRING_DATA_REDIS_HOST: localhost
-          SPRING_DATA_REDIS_PORT: 6379
+          SPRING_PROFILES_ACTIVE: test
       
-      # 4. Run Tests
+      # 4. Run Tests (com H2)
       - name: Run Tests
         run: mvn -B test
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
-          SPRING_DATASOURCE_USERNAME: postgres
-          SPRING_DATASOURCE_PASSWORD: postgres
-          SPRING_DATA_REDIS_HOST: localhost
-          SPRING_DATA_REDIS_PORT: 6379
+          SPRING_PROFILES_ACTIVE: test
+          # H2 será usado automaticamente pelo application-test.yml
       
       # 5. Upload Test Results
       - name: Upload Test Results
@@ -84,10 +52,9 @@ jobs:
       - name: Build Package
         run: mvn -B package -DskipTests
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/integration_hub_test
-          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_PROFILES_ACTIVE: dev
       
-      # 7. Build Docker Image (for Docker Hub push)
+      # 7. Build Docker Image
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       
