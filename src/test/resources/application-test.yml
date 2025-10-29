@@ -1,16 +1,10 @@
-# ============================================================================
-# APPLICATION-TEST.YML - CONFIGURAÇÃO FINAL PARA TESTES H2
-# ============================================================================
-
 spring:
-  # ========== DATASOURCE H2 ==========
   datasource:
     url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
   
-  # ========== JPA/HIBERNATE ==========
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -20,41 +14,42 @@ spring:
       hibernate:
         format_sql: false
         use_sql_comments: false
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
   
-  # ========== H2 CONSOLE ==========
   h2:
     console:
       enabled: true
       path: /h2-console
   
-  # ========== SQL INITIALIZATION ==========
   sql:
     init:
       mode: always
       platform: h2
   
-  # ========== LOGGING ==========
-  logging:
-    level:
-      org.hibernate: WARN
-      org.springframework: WARN
-      com.zaxxer.hikari: WARN
+  autoconfigure:
+    exclude: |
+      org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,
+      org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  
+  redis:
+    enabled: false
+  
+  cache:
+    type: none
 
-# ========== APPLICATION PROPERTIES ==========
 app:
   name: "TOTVS Integration Hub"
   version: "1.0.0-SNAPSHOT"
   description: "Integration Hub for Tests"
   environment: "test"
-  
-  # ========== MULTI-TENANT CONFIGURATION ==========
   multi-tenant:
     header-name: "X-Tenant-ID"
     enabled: false
     default-tenant: "test-tenant"
     strict-mode: false
 
-# ========== SWAGGER CONFIGURATION ==========
 springdoc:
   api-docs:
     enabled: false
@@ -64,11 +59,6 @@ springdoc:
 swagger:
   enabled: false
 
-# ========== CACHE CONFIGURATION ==========
-cache:
-  enabled: false
-
-# ========== MANAGEMENT ENDPOINTS ==========
 management:
   endpoints:
     web:
